@@ -24,6 +24,7 @@ interface QueryParams {
 
 // ─── Theme Definitions ────────────────────────────────────────────────────────
 // Add new themes here — each key maps to a color palette.
+// "default" is now a GitHub-dark inspired palette (cyan line on GitHub's dark bg).
 
 const THEMES: Record<
   string,
@@ -35,16 +36,18 @@ const THEMES: Record<
     point: string;
     area: string;
     axis: string;
+    grid: string;
   }
 > = {
   default: {
-    bg: "#ffffff",
-    border: "#e1e4e8",
-    title: "#24292e",
-    line: "#2188ff",
-    point: "#2188ff",
-    area: "rgba(33,136,255,0.15)",
-    axis: "#959da5",
+    bg: "#0d1117",
+    border: "#30363d",
+    title: "#39d3d8",
+    line: "#2dd4da",
+    point: "#2dd4da",
+    area: "rgba(45,212,218,0.15)",
+    axis: "#8b949e",
+    grid: "rgba(139,148,158,0.15)",
   },
   dark: {
     bg: "#0d1117",
@@ -54,6 +57,7 @@ const THEMES: Record<
     point: "#58a6ff",
     area: "rgba(88,166,255,0.15)",
     axis: "#8b949e",
+    grid: "rgba(139,148,158,0.15)",
   },
   radical: {
     bg: "#141321",
@@ -63,6 +67,7 @@ const THEMES: Record<
     point: "#f8d847",
     area: "rgba(254,66,142,0.15)",
     axis: "#a9fef7",
+    grid: "rgba(169,254,247,0.12)",
   },
   merko: {
     bg: "#0a0f0b",
@@ -72,6 +77,7 @@ const THEMES: Record<
     point: "#b7d364",
     area: "rgba(104,181,135,0.15)",
     axis: "#68b587",
+    grid: "rgba(104,181,135,0.12)",
   },
   gruvbox: {
     bg: "#282828",
@@ -81,6 +87,7 @@ const THEMES: Record<
     point: "#fe8019",
     area: "rgba(250,189,47,0.15)",
     axis: "#a89984",
+    grid: "rgba(168,153,132,0.15)",
   },
   tokyonight: {
     bg: "#1a1b27",
@@ -90,6 +97,17 @@ const THEMES: Record<
     point: "#38bdae",
     area: "rgba(191,145,243,0.15)",
     axis: "#565f89",
+    grid: "rgba(86,95,137,0.15)",
+  },
+  light: {
+    bg: "#ffffff",
+    border: "#e1e4e8",
+    title: "#24292e",
+    line: "#2188ff",
+    point: "#2188ff",
+    area: "rgba(33,136,255,0.15)",
+    axis: "#959da5",
+    grid: "rgba(149,157,165,0.25)",
   },
 };
 
@@ -177,6 +195,34 @@ async function fetchContributions(
   return allDays;
 }
 
+// ─── Smooth Path Helper ───────────────────────────────────────────────────────
+// Converts a series of points into a smooth Catmull-Rom → cubic-bezier SVG path,
+// instead of straight line segments between points.
+
+function buildSmoothPath(points: { x: number; y: number }[]): string {
+  if (points.length === 0) return "";
+  if (points.length === 1)
+    return `M${points[0].x.toFixed(2)},${points[0].y.toFixed(2)}`;
+
+  let path = `M${points[0].x.toFixed(2)},${points[0].y.toFixed(2)}`;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i === 0 ? i : i - 1];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    path += ` C${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}`;
+  }
+
+  return path;
+}
+
 // ─── SVG Renderer ─────────────────────────────────────────────────────────────
 
 function renderSVG(days: ContributionDay[], params: QueryParams): string {
@@ -190,6 +236,7 @@ function renderSVG(days: ContributionDay[], params: QueryParams): string {
   const titleColor = theme.title;
   const axisColor = theme.axis;
   const areaColor = theme.area;
+  const gridColor = theme.grid;
 
   // ── Layout constants ──────────────────────────────────────────────────────
   const WIDTH = 800;
@@ -214,12 +261,10 @@ function renderSVG(days: ContributionDay[], params: QueryParams): string {
     return { x, y, entry };
   });
 
-  // ── Build SVG path string (straight line segments) ───────────────────────
-  const linePath = points
-    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(2)},${p.y.toFixed(2)}`)
-    .join(" ");
+  // ── Build SVG path string (smooth curve through points) ──────────────────
+  const linePath = buildSmoothPath(points);
 
-  // Area fill: close the path down to the baseline and back
+  // Area fill: close the smooth path down to the baseline and back
   const areaPath =
     points.length > 0
       ? `${linePath} L${points[points.length - 1].x.toFixed(2)},${(PADDING_TOP + chartH).toFixed(2)} L${points[0].x.toFixed(2)},${(PADDING_TOP + chartH).toFixed(2)} Z`
@@ -231,7 +276,7 @@ function renderSVG(days: ContributionDay[], params: QueryParams): string {
     .map((val) => {
       const y = PADDING_TOP + chartH - (val / maxCount) * chartH;
       return `<text x="${(PADDING_LEFT - 6).toFixed(2)}" y="${y.toFixed(2)}" text-anchor="end" dominant-baseline="middle" font-size="10" fill="${axisColor}">${val}</text>
-<line x1="${PADDING_LEFT}" y1="${y.toFixed(2)}" x2="${(PADDING_LEFT + chartW).toFixed(2)}" y2="${y.toFixed(2)}" stroke="${axisColor}" stroke-width="0.5" stroke-dasharray="4,4"/>`;
+<line x1="${PADDING_LEFT}" y1="${y.toFixed(2)}" x2="${(PADDING_LEFT + chartW).toFixed(2)}" y2="${y.toFixed(2)}" stroke="${gridColor}" stroke-width="1"/>`;
     })
     .join("\n");
 
@@ -292,8 +337,8 @@ function renderSVG(days: ContributionDay[], params: QueryParams): string {
   <!-- Area fill under the line (optional) -->
   ${params.area ? `<path d="${areaPath}" fill="${areaColor}" stroke="none"/>` : ""}
 
-  <!-- Contribution line -->
-  <path d="${linePath}" fill="none" stroke="${lineColor}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <!-- Contribution line (smooth curve) -->
+  <path d="${linePath}" fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
 
   <!-- Data point dots -->
   ${dotsSVG}
