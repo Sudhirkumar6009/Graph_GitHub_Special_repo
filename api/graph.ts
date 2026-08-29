@@ -54,7 +54,7 @@ const THEMES: Record<
     border: "#30363d",
     title: "#c9d1d9",
     line: "#6C63FF",
-    point: "#3c34d1",
+    point: "#6C63FF",
     area: "rgba(88,166,255,0.15)",
     axis: "#8b949e",
     grid: "rgba(139,148,158,0.15)",
