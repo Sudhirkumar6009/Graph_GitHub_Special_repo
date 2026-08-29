@@ -3,7 +3,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ContributionDay {
-  date: string;        // "YYYY-MM-DD"
+  date: string; // "YYYY-MM-DD"
   contributionCount: number;
 }
 
@@ -25,7 +25,18 @@ interface QueryParams {
 // ─── Theme Definitions ────────────────────────────────────────────────────────
 // Add new themes here — each key maps to a color palette.
 
-const THEMES: Record<string, { bg: string; border: string; title: string; line: string; point: string; area: string; axis: string }> = {
+const THEMES: Record<
+  string,
+  {
+    bg: string;
+    border: string;
+    title: string;
+    line: string;
+    point: string;
+    area: string;
+    axis: string;
+  }
+> = {
   default: {
     bg: "#ffffff",
     border: "#e1e4e8",
@@ -86,7 +97,7 @@ const THEMES: Record<string, { bg: string; border: string; title: string; line: 
 
 async function fetchContributions(
   username: string,
-  days: number
+  days: number,
 ): Promise<ContributionDay[]> {
   const token = process.env.GH_TOKEN;
   if (!token) throw new Error("GH_TOKEN environment variable is not set.");
@@ -157,10 +168,11 @@ async function fetchContributions(
   }
 
   // Flatten weeks → days, sort by date, slice to requested range
-  const allDays: ContributionDay[] = json.data.user.contributionsCollection
-    .contributionCalendar.weeks.flatMap((w) => w.contributionDays)
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(-days); // keep only the last `days` entries
+  const allDays: ContributionDay[] =
+    json.data.user.contributionsCollection.contributionCalendar.weeks
+      .flatMap((w) => w.contributionDays)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-days); // keep only the last `days` entries
 
   return allDays;
 }
@@ -171,24 +183,24 @@ function renderSVG(days: ContributionDay[], params: QueryParams): string {
   const theme = THEMES[params.theme] ?? THEMES.default;
 
   // Allow per-param color overrides on top of the theme
-  const bgColor     = params.bg_color    ?? theme.bg;
-  const lineColor   = params.line_color  ?? theme.line;
-  const pointColor  = params.point_color ?? theme.point;
+  const bgColor = params.bg_color ?? theme.bg;
+  const lineColor = params.line_color ?? theme.line;
+  const pointColor = params.point_color ?? theme.point;
   const borderColor = theme.border;
-  const titleColor  = theme.title;
-  const axisColor   = theme.axis;
-  const areaColor   = theme.area;
+  const titleColor = theme.title;
+  const axisColor = theme.axis;
+  const areaColor = theme.area;
 
   // ── Layout constants ──────────────────────────────────────────────────────
-  const WIDTH        = 800;
-  const HEIGHT       = params.height;
-  const PADDING_TOP  = params.hide_title ? 20 : 50;  // room for title
-  const PADDING_BOT  = 40;                            // room for x-axis labels
-  const PADDING_LEFT = 45;                            // room for y-axis labels
+  const WIDTH = 800;
+  const HEIGHT = params.height;
+  const PADDING_TOP = params.hide_title ? 20 : 50; // room for title
+  const PADDING_BOT = 40; // room for x-axis labels
+  const PADDING_LEFT = 45; // room for y-axis labels
   const PADDING_RIGHT = 20;
 
-  const chartW = WIDTH  - PADDING_LEFT - PADDING_RIGHT;
-  const chartH = HEIGHT - PADDING_TOP  - PADDING_BOT;
+  const chartW = WIDTH - PADDING_LEFT - PADDING_RIGHT;
+  const chartH = HEIGHT - PADDING_TOP - PADDING_BOT;
 
   const total = days.reduce((s, d) => s + d.contributionCount, 0);
   const maxCount = Math.max(...days.map((d) => d.contributionCount), 1);
@@ -197,7 +209,8 @@ function renderSVG(days: ContributionDay[], params: QueryParams): string {
   const points = days.map((entry, i) => {
     const x = PADDING_LEFT + (i / Math.max(days.length - 1, 1)) * chartW;
     // Invert y: 0 contributions → bottom, maxCount → top
-    const y = PADDING_TOP + chartH - (entry.contributionCount / maxCount) * chartH;
+    const y =
+      PADDING_TOP + chartH - (entry.contributionCount / maxCount) * chartH;
     return { x, y, entry };
   });
 
@@ -207,9 +220,10 @@ function renderSVG(days: ContributionDay[], params: QueryParams): string {
     .join(" ");
 
   // Area fill: close the path down to the baseline and back
-  const areaPath = points.length > 0
-    ? `${linePath} L${points[points.length - 1].x.toFixed(2)},${(PADDING_TOP + chartH).toFixed(2)} L${points[0].x.toFixed(2)},${(PADDING_TOP + chartH).toFixed(2)} Z`
-    : "";
+  const areaPath =
+    points.length > 0
+      ? `${linePath} L${points[points.length - 1].x.toFixed(2)},${(PADDING_TOP + chartH).toFixed(2)} L${points[0].x.toFixed(2)},${(PADDING_TOP + chartH).toFixed(2)} Z`
+      : "";
 
   // ── Y-axis tick labels (0, mid, max) ─────────────────────────────────────
   const yTicks = [0, Math.round(maxCount / 2), maxCount];
@@ -224,11 +238,16 @@ function renderSVG(days: ContributionDay[], params: QueryParams): string {
   // ── X-axis date labels (show ~5 evenly spaced dates) ─────────────────────
   const labelCount = Math.min(5, days.length);
   const xLabelSVG = Array.from({ length: labelCount }, (_, i) => {
-    const idx = Math.round((i / Math.max(labelCount - 1, 1)) * (days.length - 1));
+    const idx = Math.round(
+      (i / Math.max(labelCount - 1, 1)) * (days.length - 1),
+    );
     const p = points[idx];
     // Format date as "MMM D"
     const d = new Date(p.entry.date + "T00:00:00");
-    const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const label = d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
     return `<text x="${p.x.toFixed(2)}" y="${(PADDING_TOP + chartH + 18).toFixed(2)}" text-anchor="middle" font-size="10" fill="${axisColor}">${label}</text>`;
   }).join("\n");
 
@@ -239,7 +258,7 @@ function renderSVG(days: ContributionDay[], params: QueryParams): string {
     ? points
         .map(
           (p) =>
-            `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="3" fill="${pointColor}" />`
+            `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="3" fill="${pointColor}" />`,
         )
         .join("\n")
     : "";
@@ -310,7 +329,12 @@ function parseBoolean(val: string | undefined, fallback: boolean): boolean {
   return val === "true" || val === "1";
 }
 
-function parseNumber(val: string | undefined, fallback: number, min: number, max: number): number {
+function parseNumber(
+  val: string | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
   const n = Number(val);
   if (!val || isNaN(n)) return fallback;
   return Math.min(max, Math.max(min, n));
@@ -318,30 +342,32 @@ function parseNumber(val: string | undefined, fallback: number, min: number, max
 
 // ─── Vercel Handler ───────────────────────────────────────────────────────────
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: VercelRequest, res: VercelResponse) {
   const q = req.query as Record<string, string>;
 
   // Validate required param
   const username = q.username?.trim();
   if (!username) {
     res.setHeader("Content-Type", "image/svg+xml");
-    return res.status(400).send(renderErrorSVG("Missing required query param: username"));
+    return res
+      .status(400)
+      .send(renderErrorSVG("Missing required query param: username"));
   }
 
   // Parse all optional params with safe defaults
   const params: QueryParams = {
     username,
-    theme:        q.theme && THEMES[q.theme] ? q.theme : "default",
-    bg_color:     q.bg_color,
-    line_color:   q.line_color,
-    point_color:  q.point_color,
-    area:         parseBoolean(q.area, false),
-    hide_border:  parseBoolean(q.hide_border, false),
-    hide_title:   parseBoolean(q.hide_title, false),
+    theme: q.theme && THEMES[q.theme] ? q.theme : "default",
+    bg_color: q.bg_color,
+    line_color: q.line_color,
+    point_color: q.point_color,
+    area: parseBoolean(q.area, false),
+    hide_border: parseBoolean(q.hide_border, false),
+    hide_title: parseBoolean(q.hide_title, false),
     custom_title: q.custom_title,
-    height:       parseNumber(q.height, 200, 100, 600),
-    days:         parseNumber(q.days, 31, 7, 365),
-    radius:       parseNumber(q.radius, 8, 0, 30),
+    height: parseNumber(q.height, 200, 100, 600),
+    days: parseNumber(q.days, 31, 7, 365),
+    radius: parseNumber(q.radius, 8, 0, 30),
   };
 
   try {
@@ -352,7 +378,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader("Cache-Control", "public, max-age=1800, s-maxage=1800");
     res.setHeader("Content-Type", "image/svg+xml");
     return res.status(200).send(svg);
-
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[graph] Error:", message);
@@ -363,3 +388,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).send(renderErrorSVG(message));
   }
 }
+module.exports = handler;
